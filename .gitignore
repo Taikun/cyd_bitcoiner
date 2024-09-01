@@ -1,0 +1,46 @@
+# Archivos de configuración del sistema
+.DS_Store
+Thumbs.db
+
+# Archivos de proyecto de Arduino generados
+*.ino.*
+*.cpp.*
+*.elf
+*.bin
+*.hex
+*.eep
+*.map
+*.out
+*.o
+
+# Archivos temporales y carpetas creadas por el IDE
+*.log
+*.tmp
+*.tmp.*
+*.cache
+*.txt
+
+# Carpetas de construcción local
+build/
+.build/
+
+# Archivos de compilación de bibliotecas
+libraries/**/examples/**/build/
+
+# Archivos generados por el compilador
+*.d
+*.s
+*.S
+*.a
+
+# Ficheros de configuración de WiFi
+wifi_credentials.h
+
+# Carpetas generadas por Visual Studio Code
+.vscode/
+
+# Carpetas generadas por JetBrains IDEs (Ej. CLion)
+.idea/
+
+# Carpetas generadas por la librería PlatformIO
+.pio/
