@@ -8,6 +8,7 @@
 
 TFT_eSPI tft = TFT_eSPI();
 
+
 #define XPT2046_IRQ 36
 #define XPT2046_MOSI 32
 #define XPT2046_MISO 39
@@ -21,18 +22,22 @@ XPT2046_Touchscreen touchscreen(XPT2046_CS, XPT2046_IRQ);
 #define SCREEN_HEIGHT 320
 #define FONT_SIZE 2
 
-// Usamos las constantes de color predefinidas
 #define TERMINAL_COLOR TFT_GREEN
 #define BACKGROUND_COLOR TFT_BLACK
+#define CHART_COLOR TFT_YELLOW
 
 int x, y, z;
 int currentScreen = 0; // 0: Splash, 1: Selector, 2: Precio
 String selectedCrypto = "";
 unsigned long lastUpdate = 0;
-const unsigned long updateInterval = 300000; // 5 minutos en milisegundos
+const unsigned long updateInterval = 1800000; // 30 minutos en milisegundos
 
 const String bitcoinURL = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd";
 const String ethereumURL = "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd";
+
+#define MAX_PRICE_HISTORY 24
+float priceHistory[MAX_PRICE_HISTORY];
+int priceHistoryIndex = 0;
 
 void connectToWiFi() {
   WiFi.begin(ssid, password);
@@ -109,6 +114,47 @@ void drawSelectorScreen() {
   }
 }
 
+
+void calculateMinMaxPrice(float &minPrice, float &maxPrice) {
+  minPrice = priceHistory[0];
+  maxPrice = priceHistory[0];
+  for (int i = 1; i < MAX_PRICE_HISTORY; i++) {
+    if (priceHistory[i] < minPrice) minPrice = priceHistory[i];
+    if (priceHistory[i] > maxPrice) maxPrice = priceHistory[i];
+  }
+}
+
+
+void drawChart() {
+  int chartWidth = SCREEN_WIDTH - 40;
+  int chartHeight = SCREEN_HEIGHT - 150;  // Dejar espacio para la cotización y la cuenta regresiva
+  int chartX = 20;
+  int chartY = 100;  // Ajustar para dejar espacio para la cotización de precio
+
+  float minPrice, maxPrice;
+  calculateMinMaxPrice(minPrice, maxPrice); // Calcular precios mínimos y máximos
+
+  // Dibujar ejes
+  tft.drawLine(chartX, chartY, chartX, chartY + chartHeight, TERMINAL_COLOR);
+  tft.drawLine(chartX, chartY + chartHeight, chartX + chartWidth, chartY + chartHeight, TERMINAL_COLOR);
+
+  // Dibujar líneas del gráfico con colores dependiendo de si sube o baja el precio
+  for (int i = 0; i < MAX_PRICE_HISTORY - 1; i++) {
+    int x1 = chartX + (i * chartWidth / (MAX_PRICE_HISTORY - 1));
+    int y1 = chartY + chartHeight - ((priceHistory[i] - minPrice) / (maxPrice - minPrice) * chartHeight);
+    int x2 = chartX + ((i + 1) * chartWidth / (MAX_PRICE_HISTORY - 1));
+    int y2 = chartY + chartHeight - ((priceHistory[i + 1] - minPrice) / (maxPrice - minPrice) * chartHeight);
+
+    // Dibujar línea en verde si sube, rojo si baja
+    if (priceHistory[i + 1] >= priceHistory[i]) {
+      tft.drawLine(x1, y1, x2, y2, TFT_GREEN);
+    } else {
+      tft.drawLine(x1, y1, x2, y2, TFT_RED);
+    }
+  }
+
+  // No se dibujan etiquetas de los ejes para un gráfico más limpio
+}
 void drawPriceScreen(String crypto, String price) {
   tft.fillScreen(BACKGROUND_COLOR);
   tft.setTextColor(TERMINAL_COLOR);
@@ -121,14 +167,22 @@ void drawPriceScreen(String crypto, String price) {
   // Precio
   tft.setTextSize(4);
   String priceDisplay = price + "$";
-  int textWidth = priceDisplay.length() * 24; // Estimación aproximada del ancho del texto
+  int textWidth = priceDisplay.length() * 24;
   int x = (SCREEN_WIDTH - textWidth) / 2;
-  int y = SCREEN_HEIGHT / 2 - 16; // 16 es aproximadamente la mitad de la altura del texto
+  int y = 60;  // Ajustar para que quede arriba de la gráfica
   tft.setCursor(x, y);
   tft.println(priceDisplay);
   
+  // Añadir el precio al historial
+  priceHistory[priceHistoryIndex] = price.toFloat();
+  priceHistoryIndex = (priceHistoryIndex + 1) % MAX_PRICE_HISTORY;
+  
+  // Dibujar la gráfica
+  drawChart();
+  
   updateCountdown();
 }
+
 
 void updateCountdown() {
   unsigned long elapsedTime = millis() - lastUpdate;
@@ -142,6 +196,7 @@ void updateCountdown() {
   tft.setCursor(10, SCREEN_HEIGHT - 30);
   tft.printf("Actualiza: %02d:%02d", minutes, seconds);
 }
+
 
 void checkTouch() {
   if (touchscreen.tirqTouched() && touchscreen.touched()) {
@@ -178,6 +233,11 @@ void setup() {
   tft.init();
   tft.setRotation(0);
   tft.invertDisplay(true);
+  
+  // Inicializar el historial de precios
+  for (int i = 0; i < MAX_PRICE_HISTORY; i++) {
+    priceHistory[i] = 0;
+  }
   
   connectToWiFi();
   drawSplashScreen();
